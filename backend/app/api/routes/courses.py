@@ -7,6 +7,8 @@ from app.api.deps import ContentAuth, DbSession, StudentAuth
 from app.core.errors import api_error
 from app.models import Course, Enrollment, EnrollmentStatus
 from app.schemas.course import CourseContentOut, CourseOut
+from app.schemas.lesson import LessonPublicOut
+from app.services import lesson_service
 
 router = APIRouter(prefix="/courses", tags=["student courses"])
 
@@ -38,4 +40,7 @@ async def course_content(course_id: uuid.UUID, auth: ContentAuth, db: DbSession)
     )
     if course is None:
         raise api_error(404, "course_not_found", "Kurs topilmadi yoki siz unga yozilmagansiz")
-    return CourseContentOut(course=CourseOut.model_validate(course))
+    lessons = await lesson_service.list_lessons(db, course.id, only_ready=True)
+    return CourseContentOut(
+        course=CourseOut.model_validate(course), lessons=[LessonPublicOut.model_validate(x) for x in lessons]
+    )

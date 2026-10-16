@@ -5,6 +5,7 @@ from pydantic import BaseModel, Field, field_validator
 
 from app.core.phone import normalize_phone
 from app.models import ConsentType, EnrollmentStatus
+from app.schemas.lesson import LessonPublicOut
 
 
 class CourseCreate(BaseModel):
@@ -41,8 +42,8 @@ class EnrollmentOut(BaseModel):
 
 class CourseContentOut(BaseModel):
     course: CourseOut
-    # Lessons/videos come in a later stage
-    lessons: list[dict] = []
+    # Only lessons whose video is ready. Play one with POST /lessons/{id}/playback
+    lessons: list[LessonPublicOut] = []
 
 
 class DeviceOut(BaseModel):
