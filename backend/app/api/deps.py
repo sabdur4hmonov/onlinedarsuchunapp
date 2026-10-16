@@ -14,10 +14,14 @@ from app.core.security import ACCESS_TOKEN_TYPE, decode_token
 from app.db.session import get_db
 from app.models import User, UserRole, UserSession
 from app.services import consent_service, device_service
+from app.services.live import LiveProvider, get_live_provider
+from app.services.storage import RecordingStorage, get_recording_storage
 from app.services.video import VideoProvider, get_video_provider
 
 DbSession = Annotated[AsyncSession, Depends(get_db)]
 VideoProviderDep = Annotated[VideoProvider, Depends(get_video_provider)]
+LiveProviderDep = Annotated[LiveProvider, Depends(get_live_provider)]
+RecordingStorageDep = Annotated[RecordingStorage, Depends(get_recording_storage)]
 
 _settings = get_settings()
 login_rate_limiter = SlidingWindowRateLimiter(
@@ -27,6 +31,10 @@ login_rate_limiter = SlidingWindowRateLimiter(
 playback_rate_limiter = SlidingWindowRateLimiter(
     max_attempts=_settings.playback_rate_limit_attempts,
     window_seconds=_settings.playback_rate_limit_window_seconds,
+)
+live_join_rate_limiter = SlidingWindowRateLimiter(
+    max_attempts=_settings.live_join_rate_limit_attempts,
+    window_seconds=_settings.live_join_rate_limit_window_seconds,
 )
 
 _bearer = HTTPBearer(auto_error=False)

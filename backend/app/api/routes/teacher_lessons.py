@@ -2,9 +2,9 @@ import uuid
 
 from fastapi import APIRouter
 
-from app.api.deps import ClientIp, DbSession, TeacherAuth, VideoProviderDep
+from app.api.deps import ClientIp, DbSession, RecordingStorageDep, TeacherAuth, VideoProviderDep
 from app.schemas.lesson import LessonCreate, LessonOut, LessonReorder, LessonUpdate, VideoUploadOut
-from app.services import lesson_service
+from app.services import lesson_service, recording_service
 
 router = APIRouter(prefix="/teacher", tags=["teacher lessons"])
 
@@ -62,10 +62,17 @@ async def start_video_upload(
 
 @router.post("/lessons/{lesson_id}/sync-status", response_model=LessonOut)
 async def sync_video_status(
-    lesson_id: uuid.UUID, auth: TeacherAuth, db: DbSession, ip: ClientIp, provider: VideoProviderDep
+    lesson_id: uuid.UUID,
+    auth: TeacherAuth,
+    db: DbSession,
+    ip: ClientIp,
+    provider: VideoProviderDep,
+    storage: RecordingStorageDep,
 ):
     """Asks the provider for the current video status (useful locally, where webhooks cannot reach you)."""
     lesson = await lesson_service.get_own_lesson(db, teacher=auth.user, lesson_id=lesson_id)
-    return await lesson_service.sync_video_status(
+    lesson = await lesson_service.sync_video_status(
         db, lesson=lesson, provider=provider, ip=ip, source="manual_sync", actor_id=auth.user.id
     )
+    await recording_service.on_lesson_video_status(db, lesson, storage=storage, ip=ip)
+    return lesson
