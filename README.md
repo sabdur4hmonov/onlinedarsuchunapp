@@ -4,7 +4,7 @@ O'zbekistondagi online o'qituvchilar uchun platforma.
 
 | Papka | Nima | Holat |
 |---|---|---|
-| [`backend/`](backend/README.md) | FastAPI + PostgreSQL API | 1-bosqich: asos tayyor |
+| [`backend/`](backend/README.md) | FastAPI + PostgreSQL API | auth, qurilmalar, darslar, DRM video (VdoCipher) |
 | `teacher-panel/` | O'qituvchi web paneli | keyinroq |
 | `mobile/` | Flutter mobil ilova | keyinroq |
 
