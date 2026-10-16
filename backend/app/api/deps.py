@@ -14,13 +14,19 @@ from app.core.security import ACCESS_TOKEN_TYPE, decode_token
 from app.db.session import get_db
 from app.models import User, UserRole, UserSession
 from app.services import consent_service, device_service
+from app.services.video import VideoProvider, get_video_provider
 
 DbSession = Annotated[AsyncSession, Depends(get_db)]
+VideoProviderDep = Annotated[VideoProvider, Depends(get_video_provider)]
 
 _settings = get_settings()
 login_rate_limiter = SlidingWindowRateLimiter(
     max_attempts=_settings.login_rate_limit_attempts,
     window_seconds=_settings.login_rate_limit_window_seconds,
+)
+playback_rate_limiter = SlidingWindowRateLimiter(
+    max_attempts=_settings.playback_rate_limit_attempts,
+    window_seconds=_settings.playback_rate_limit_window_seconds,
 )
 
 _bearer = HTTPBearer(auto_error=False)

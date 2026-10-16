@@ -22,6 +22,15 @@ class AuditEvent(enum.StrEnum):
     REFRESH_TOKEN_REUSE_DETECTED = "refresh_token_reuse_detected"
     LOGOUT = "logout"
     CONSENT_GRANTED = "consent_granted"
+    LESSON_CREATED = "lesson_created"
+    LESSON_UPDATED = "lesson_updated"
+    LESSON_DELETED = "lesson_deleted"
+    LESSONS_REORDERED = "lessons_reordered"
+    VIDEO_UPLOAD_STARTED = "video_upload_started"
+    VIDEO_STATUS_UPDATED = "video_status_updated"
+    WEBHOOK_REJECTED = "webhook_rejected"
+    PLAYBACK_GRANTED = "playback_granted"
+    PLAYBACK_DENIED = "playback_denied"
 
 
 def log_event(
