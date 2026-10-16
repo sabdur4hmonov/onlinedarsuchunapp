@@ -32,6 +32,13 @@ class Settings(BaseSettings):
     # "production" refuses to start with the mock video provider (no DRM there!)
     environment: str = "development"
 
+    # Browser origins allowed to call the API directly (comma-separated), e.g. the teacher panel.
+    # The panel talks to the API from its server (BFF), so normally only uploads need this.
+    cors_allowed_origins: str = ""
+    # Proxies whose X-Forwarded-For header is trusted (comma-separated IPs), e.g. the panel server.
+    # From anyone else the header is ignored, so clients cannot fake their IP.
+    trusted_proxy_ips: str = ""
+
     # --- Video (VdoCipher). Empty secret -> MockVideoProvider is used (dev and tests) ---
     vdocipher_api_secret: str = ""
     vdocipher_api_base_url: str = "https://dev.vdocipher.com/api"
@@ -41,6 +48,9 @@ class Settings(BaseSettings):
     playback_otp_ttl_seconds: int = Field(default=300, ge=30, le=300)
     playback_rate_limit_attempts: int = 10
     playback_rate_limit_window_seconds: int = 60
+    # Mock mode only: where browsers upload files (e.g. http://localhost:8000/dev/mock-video-upload).
+    # Empty = uploads are impossible and "sync-status" marks videos ready right away.
+    mock_video_upload_url: str = ""
 
     # --- Live lessons: LiveKit. Any of the three empty -> MockLiveProvider (dev and tests) ---
     # URL the mobile app / browser connects to (ws:// locally, wss:// in production)
@@ -67,6 +77,14 @@ class Settings(BaseSettings):
     recordings_s3_secret_key: str = ""
     # VdoCipher downloads the mp4 through this link; keep it short
     recordings_presigned_url_ttl_seconds: int = Field(default=1800, ge=60, le=6 * 3600)
+
+    @property
+    def cors_origins(self) -> list[str]:
+        return [o.strip() for o in self.cors_allowed_origins.split(",") if o.strip()]
+
+    @property
+    def trusted_proxies(self) -> set[str]:
+        return {ip.strip() for ip in self.trusted_proxy_ips.split(",") if ip.strip()}
 
     @property
     def livekit_configured(self) -> bool:

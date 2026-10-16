@@ -113,6 +113,9 @@ async def client(session_factory, video, live, storage, monkeypatch):
     monkeypatch.setattr(get_settings(), "vdocipher_webhook_secret", WEBHOOK_SECRET)
     monkeypatch.setattr(get_settings(), "livekit_api_key", LIVEKIT_TEST_KEY)
     monkeypatch.setattr(get_settings(), "livekit_api_secret", LIVEKIT_TEST_SECRET)
+    # Independent of the developer's .env: no trusted proxies, no CORS origins unless a test sets them
+    monkeypatch.setattr(get_settings(), "trusted_proxy_ips", "")
+    monkeypatch.setattr(get_settings(), "cors_allowed_origins", "")
     # Most tests do many requests from one IP / user; rate-limit tests lower these again
     for limiter in (login_rate_limiter, playback_rate_limiter, live_join_rate_limiter):
         limiter.reset()

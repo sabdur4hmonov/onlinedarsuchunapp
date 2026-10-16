@@ -41,9 +41,16 @@ _bearer = HTTPBearer(auto_error=False)
 
 
 def client_ip(request: Request) -> str | None:
-    # NOTE: behind a reverse proxy (nginx etc.) this becomes the proxy's IP.
-    # Then configure uvicorn --proxy-headers / --forwarded-allow-ips so the real IP is used.
-    return request.client.host if request.client else None
+    """Real client IP. X-Forwarded-For is honoured ONLY from TRUSTED_PROXY_IPS (e.g. the teacher
+    panel's server, which forwards the browser's IP); otherwise anyone could fake their IP and
+    dodge the login rate limit. The last entry is the one our own proxy appended."""
+    peer = request.client.host if request.client else None
+    if peer and peer in get_settings().trusted_proxies:
+        forwarded = request.headers.get("x-forwarded-for", "")
+        last = forwarded.split(",")[-1].strip()
+        if last:
+            return last[:45]
+    return peer
 
 
 ClientIp = Annotated[str | None, Depends(client_ip)]

@@ -40,4 +40,4 @@ def get_video_provider() -> VideoProvider:
     if settings.environment == "production":
         raise RuntimeError("VDOCIPHER_API_SECRET is empty: refusing to serve videos without DRM in production")
     logger.warning("VDOCIPHER_API_SECRET is empty -> MockVideoProvider is used (no real DRM, dev only)")
-    return MockVideoProvider(auto_ready=True)
+    return MockVideoProvider(auto_ready=True, upload_base_url=settings.mock_video_upload_url or None)

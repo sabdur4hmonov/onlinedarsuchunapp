@@ -24,10 +24,15 @@ from app.services.video.vdocipher import build_otp_body, parse_vdocipher_webhook
 class MockVideoProvider(VideoProvider):
     name = "mock"
 
-    def __init__(self, *, auto_ready: bool = False) -> None:
-        # auto_ready=True (dev server): every uploaded video reports "ready" when asked,
-        # so the whole flow can be clicked through in /docs without a real upload.
+    def __init__(self, *, auto_ready: bool = False, upload_base_url: str | None = None) -> None:
+        # auto_ready=True (dev server): a video that finished "uploading" reports "ready" when asked.
+        # Without upload_base_url nothing can be uploaded, so then even "uploading" videos turn ready,
+        # and the whole flow can still be clicked through in /docs.
         self.auto_ready = auto_ready
+        # upload_base_url (dev server): browsers really POST the file there (see app/api/routes/dev.py),
+        # so the teacher panel's upload + progress bar work without VdoCipher.
+        self.upload_base_url = upload_base_url.rstrip("/") if upload_base_url else None
+        self.upload_tokens: dict[str, str] = {}
         self.videos: dict[str, VideoInfo] = {}
         self.otp_requests: list[dict] = []
         self.deleted: list[str] = []
@@ -41,11 +46,28 @@ class MockVideoProvider(VideoProvider):
     async def create_upload(self, *, title: str) -> UploadCredentials:
         video_id = f"mock-{uuid.uuid4().hex}"
         self.videos[video_id] = VideoInfo(status=LessonStatus.UPLOADING)
+        if self.upload_base_url:
+            token = secrets.token_urlsafe(24)
+            self.upload_tokens[video_id] = token
+            return UploadCredentials(
+                video_id=video_id,
+                upload_url=f"{self.upload_base_url}/{video_id}?token={token}",
+                fields={"key": video_id},
+            )
         return UploadCredentials(
             video_id=video_id,
             upload_url=f"https://mock-video.invalid/upload/{video_id}",
             fields={"key": video_id, "policy": "mock-policy"},
         )
+
+    def accept_upload(self, video_id: str, token: str) -> bool:
+        """Called by the dev upload endpoint once the file arrived. One-time token."""
+        expected = self.upload_tokens.get(video_id)
+        if not expected or not secrets.compare_digest(expected, token):
+            return False
+        del self.upload_tokens[video_id]
+        self.videos[video_id] = VideoInfo(status=LessonStatus.PROCESSING)
+        return True
 
     async def import_from_url(self, *, url: str, title: str) -> str:
         if self.fail_import:
@@ -57,7 +79,8 @@ class MockVideoProvider(VideoProvider):
 
     async def get_video_info(self, video_id: str) -> VideoInfo | None:
         info = self.videos.get(video_id)
-        if info is not None and self.auto_ready and info.status != LessonStatus.READY:
+        promotable = {LessonStatus.PROCESSING} if self.upload_base_url else {LessonStatus.UPLOADING, LessonStatus.PROCESSING}
+        if info is not None and self.auto_ready and info.status in promotable:
             info = VideoInfo(status=LessonStatus.READY, duration_seconds=600)
             self.videos[video_id] = info
         return info

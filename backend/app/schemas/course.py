@@ -76,3 +76,32 @@ class ConsentOut(BaseModel):
     granted_at: datetime
 
     model_config = {"from_attributes": True}
+
+
+class CourseUpdate(BaseModel):
+    title: str | None = Field(default=None, min_length=1, max_length=255)
+    description: str | None = None
+
+
+class CourseStudentOut(BaseModel):
+    id: uuid.UUID
+    full_name: str
+    phone: str
+    enrollment_status: EnrollmentStatus
+    active_devices: int
+
+
+class AuditActorOut(BaseModel):
+    id: uuid.UUID
+    full_name: str
+    phone: str
+    role: str
+
+
+class AuditEventOut(BaseModel):
+    id: int
+    event_type: str
+    created_at: datetime
+    ip: str | None
+    actor: AuditActorOut | None
+    details: dict
