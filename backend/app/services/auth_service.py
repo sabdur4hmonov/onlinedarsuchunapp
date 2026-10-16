@@ -36,6 +36,16 @@ def _device_limit_error(max_devices: int):
     )
 
 
+async def _reject_device_of_other_account(db: AsyncSession, *, user: User, device_id: str, ip: str | None):
+    log_event(db, AuditEvent.DEVICE_ALREADY_BOUND_TO_OTHER_ACCOUNT, user_id=user.id, ip=ip, device_id=device_id)
+    await db.commit()
+    return api_error(
+        409,
+        "device_already_bound_to_other_account",
+        "Bu qurilma boshqa akkauntga bog'langan. Uni bo'shatish uchun o'qituvchingizga murojaat qiling.",
+    )
+
+
 async def register_student(db: AsyncSession, *, phone: str, full_name: str, password: str, ip: str | None) -> User:
     user = User(id=uuid.uuid4(), phone=phone, full_name=full_name, password_hash=hash_password(password), role=UserRole.STUDENT)
     db.add(user)
@@ -73,6 +83,10 @@ async def continue_login(
 
     if await device_service.get_active_device(db, user.id, device_id):
         return await session_service.open_session(db, user=user, device_id=device_id, ip=ip)
+
+    # One physical device = one student account
+    if await device_service.is_bound_to_other_account(db, user.id, device_id):
+        raise await _reject_device_of_other_account(db, user=user, device_id=device_id, ip=ip)
 
     # Unknown device. Rule 2: with the limit reached, login is refused outright.
     bound = await device_service.count_active_devices(db, user.id)
@@ -112,13 +126,18 @@ async def confirm_device_binding(
         raise api_error(401, "invalid_binding_token", "Tasdiqlash muddati o'tgan, qaytadan kiring")
 
     if not await device_service.get_active_device(db, user.id, device_id):
+        if await device_service.is_bound_to_other_account(db, user.id, device_id):
+            raise await _reject_device_of_other_account(db, user=user, device_id=device_id, ip=ip)
         if await device_service.count_active_devices(db, user.id) >= settings.max_student_devices:
             log_event(
                 db, AuditEvent.LOGIN_DENIED, user_id=user.id, ip=ip, reason="device_limit_reached", device_id=device_id
             )
             await db.commit()
             raise _device_limit_error(settings.max_student_devices)
-        await device_service.bind_device(
-            db, user=user, device_id=device_id, device_name=device_name, platform=platform, ip=ip
-        )
+        try:
+            await device_service.bind_device(
+                db, user=user, device_id=device_id, device_name=device_name, platform=platform, ip=ip
+            )
+        except device_service.DeviceBoundToOtherAccount:
+            raise await _reject_device_of_other_account(db, user=user, device_id=device_id, ip=ip) from None
     return await session_service.open_session(db, user=user, device_id=device_id, ip=ip)

@@ -1,7 +1,7 @@
 import uuid
 from datetime import datetime
 
-from sqlalchemy import Boolean, DateTime, ForeignKey, String, UniqueConstraint, func
+from sqlalchemy import Boolean, DateTime, ForeignKey, Index, String, UniqueConstraint, func, text
 from sqlalchemy.orm import Mapped, mapped_column
 
 from app.db.base import Base
@@ -11,7 +11,12 @@ class Device(Base):
     __tablename__ = "devices"
     # One row per (user, physical device). After a teacher reset the row stays
     # (is_active=False) for history and is re-activated if the device is bound again.
-    __table_args__ = (UniqueConstraint("user_id", "device_id", name="uq_devices_user_id_device_id"),)
+    __table_args__ = (
+        UniqueConstraint("user_id", "device_id", name="uq_devices_user_id_device_id"),
+        # One physical device can be ACTIVELY bound to only one account at a time.
+        # Inactive (reset) rows are ignored, so after a reset the device is free again.
+        Index("uq_devices_active_device_id", "device_id", unique=True, postgresql_where=text("is_active")),
+    )
 
     id: Mapped[uuid.UUID] = mapped_column(primary_key=True, default=uuid.uuid4)
     user_id: Mapped[uuid.UUID] = mapped_column(ForeignKey("users.id"), index=True)
