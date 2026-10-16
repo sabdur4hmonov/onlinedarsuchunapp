@@ -17,14 +17,16 @@ from sqlalchemy import select, text
 from sqlalchemy.ext.asyncio import AsyncSession, async_sessionmaker, create_async_engine
 from sqlalchemy.pool import NullPool
 
-from app.api.deps import login_rate_limiter
+from app.api.deps import login_rate_limiter, playback_rate_limiter
 from app.core.config import get_settings
 from app.core.security import hash_password
 from app.db.session import get_db
 from app.main import app
 from app.models import AuditLog, Course, Enrollment, User, UserRole
+from app.services.video import MockVideoProvider, get_video_provider
 
 PASSWORD = "Str0ng-pass!"
+WEBHOOK_SECRET = "test-webhook-secret"
 
 
 def _test_db_url() -> str:
@@ -60,8 +62,8 @@ async def session_factory():
     async with engine.begin() as conn:
         await conn.execute(
             text(
-                "TRUNCATE audit_logs, consents, used_refresh_tokens, sessions, devices, enrollments, courses, "
-                "users RESTART IDENTITY CASCADE"
+                "TRUNCATE audit_logs, consents, used_refresh_tokens, sessions, devices, lessons, enrollments, "
+                "courses, users RESTART IDENTITY CASCADE"
             )
         )
     yield async_sessionmaker(engine, expire_on_commit=False)
@@ -75,20 +77,32 @@ async def db(session_factory) -> AsyncSession:
 
 
 @pytest.fixture
-async def client(session_factory):
+def video() -> MockVideoProvider:
+    """Fresh fake VdoCipher for every test. Tests NEVER call the real provider,
+    even if VDOCIPHER_API_SECRET is set in .env."""
+    return MockVideoProvider()
+
+
+@pytest.fixture
+async def client(session_factory, video, monkeypatch):
     async def _get_test_db():
         async with session_factory() as session:
             yield session
 
     app.dependency_overrides[get_db] = _get_test_db
-    # Most tests do many logins from one IP; the rate-limit test lowers this again
-    login_rate_limiter.reset()
-    login_rate_limiter.max_attempts = 1000
+    app.dependency_overrides[get_video_provider] = lambda: video
+    monkeypatch.setattr(get_settings(), "vdocipher_webhook_secret", WEBHOOK_SECRET)
+    # Most tests do many requests from one IP / user; rate-limit tests lower these again
+    for limiter in (login_rate_limiter, playback_rate_limiter):
+        limiter.reset()
+        limiter.max_attempts = 1000
     async with AsyncClient(transport=ASGITransport(app=app), base_url="http://test") as c:
         yield c
     app.dependency_overrides.clear()
-    login_rate_limiter.reset()
     login_rate_limiter.max_attempts = get_settings().login_rate_limit_attempts
+    playback_rate_limiter.max_attempts = get_settings().playback_rate_limit_attempts
+    for limiter in (login_rate_limiter, playback_rate_limiter):
+        limiter.reset()
 
 
 # ---------- helpers ----------
