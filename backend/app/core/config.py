@@ -29,6 +29,19 @@ class Settings(BaseSettings):
 
     consent_version: str = "1.0"
 
+    # "production" refuses to start with the mock video provider (no DRM there!)
+    environment: str = "development"
+
+    # --- Video (VdoCipher). Empty secret -> MockVideoProvider is used (dev and tests) ---
+    vdocipher_api_secret: str = ""
+    vdocipher_api_base_url: str = "https://dev.vdocipher.com/api"
+    # Shared secret that must be present in the webhook URL (?token=...)
+    vdocipher_webhook_secret: str = ""
+    # Life of a playback OTP. Hard upper bound: 5 minutes.
+    playback_otp_ttl_seconds: int = Field(default=300, ge=30, le=300)
+    playback_rate_limit_attempts: int = 10
+    playback_rate_limit_window_seconds: int = 60
+
 
 @lru_cache
 def get_settings() -> Settings:
