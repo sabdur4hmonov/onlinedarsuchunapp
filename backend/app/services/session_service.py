@@ -7,7 +7,7 @@ from sqlalchemy.ext.asyncio import AsyncSession
 from app.core.config import get_settings
 from app.core.errors import api_error
 from app.core.security import create_access_token, generate_refresh_token, hash_refresh_token
-from app.models import User, UserRole, UserSession
+from app.models import UsedRefreshToken, User, UserRole, UserSession
 from app.schemas.auth import TokenResponse
 from app.services import device_service
 from app.services.audit import AuditEvent, log_event
@@ -94,15 +94,34 @@ async def _reject_refresh(db: AsyncSession, *, user_id: uuid.UUID | None, ip: st
     return api_error(401, "invalid_refresh_token", "Sessiya tugagan, qaytadan kiring")
 
 
+async def _handle_reuse(db: AsyncSession, *, used: UsedRefreshToken, ip: str | None, device_id: str):
+    """An already rotated refresh token came back: either the attacker or the real user
+    holds a stolen copy, and we cannot tell which one. Log everybody out."""
+    revoked = await revoke_sessions(db, user_id=used.user_id, reason="refresh_token_reuse", ip=ip)
+    log_event(
+        db,
+        AuditEvent.REFRESH_TOKEN_REUSE_DETECTED,
+        user_id=used.user_id,
+        ip=ip,
+        session_id=used.session_id,
+        device_id=device_id,
+        revoked_session_ids=revoked,
+    )
+    await db.commit()
+    return api_error(401, "invalid_refresh_token", "Sessiya tugagan, qaytadan kiring")
+
+
 async def refresh(db: AsyncSession, *, refresh_token: str, device_id: str, ip: str | None) -> TokenResponse:
     """Refresh token rotation: the old refresh token stops working, a new one is returned."""
+    token_hash = hash_refresh_token(refresh_token)
     session = await db.scalar(
-        select(UserSession)
-        .where(UserSession.refresh_token_hash == hash_refresh_token(refresh_token))
-        .with_for_update()
+        select(UserSession).where(UserSession.refresh_token_hash == token_hash).with_for_update()
     )
     if session is None:
-        # Unknown, already rotated, or made up
+        used = await db.get(UsedRefreshToken, token_hash)
+        if used is not None:
+            raise await _handle_reuse(db, used=used, ip=ip, device_id=device_id)
+        # Unknown or made up
         raise await _reject_refresh(db, user_id=None, ip=ip, reason="unknown_token")
     if session.revoked_at is not None:
         raise await _reject_refresh(db, user_id=session.user_id, ip=ip, reason="session_revoked")
@@ -116,6 +135,8 @@ async def refresh(db: AsyncSession, *, refresh_token: str, device_id: str, ip: s
         raise await _reject_refresh(db, user_id=user.id, ip=ip, reason="device_not_bound")
 
     new_refresh_token = generate_refresh_token()
+    # Remember the old token: if it ever comes back, it was stolen (reuse detection)
+    db.add(UsedRefreshToken(token_hash=token_hash, session_id=session.id, user_id=user.id))
     session.refresh_token_hash = hash_refresh_token(new_refresh_token)
     session.last_seen_at = _now()
     log_event(db, AuditEvent.TOKEN_REFRESHED, user_id=user.id, ip=ip, session_id=session.id)

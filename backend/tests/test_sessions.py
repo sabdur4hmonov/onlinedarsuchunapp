@@ -53,10 +53,10 @@ async def test_refresh_rotation_invalidates_old_refresh_token(client):
     new_refresh = r.json()["refresh_token"]
     assert new_refresh != tokens.refresh
 
-    # Old one is used up
-    assert (await client.post("/auth/refresh", json={"refresh_token": tokens.refresh}, headers=headers)).status_code == 401
     # New one works
     assert (await client.post("/auth/refresh", json={"refresh_token": new_refresh}, headers=headers)).status_code == 200
+    # Old one is used up (sending it again also triggers reuse detection, see test_security_fixes.py)
+    assert (await client.post("/auth/refresh", json={"refresh_token": tokens.refresh}, headers=headers)).status_code == 401
 
 
 async def test_token_with_other_device_id_is_rejected(client):

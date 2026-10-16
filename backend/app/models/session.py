@@ -23,3 +23,18 @@ class UserSession(Base):
     expires_at: Mapped[datetime] = mapped_column(DateTime(timezone=True))
     revoked_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True))
     revoke_reason: Mapped[str | None] = mapped_column(String(64))
+
+
+class UsedRefreshToken(Base):
+    """Hashes of refresh tokens that were already rotated (exchanged for a new one).
+
+    If one of them is ever presented again, somebody kept a copy -> reuse detection
+    revokes every session of the user (see session_service.refresh).
+    """
+
+    __tablename__ = "used_refresh_tokens"
+
+    token_hash: Mapped[str] = mapped_column(String(64), primary_key=True)
+    session_id: Mapped[uuid.UUID] = mapped_column(ForeignKey("sessions.id"), index=True)
+    user_id: Mapped[uuid.UUID] = mapped_column(ForeignKey("users.id"), index=True)
+    rotated_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), server_default=func.now())

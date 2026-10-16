@@ -59,7 +59,10 @@ async def session_factory():
     engine = create_async_engine(_test_db_url(), poolclass=NullPool)
     async with engine.begin() as conn:
         await conn.execute(
-            text("TRUNCATE audit_logs, consents, sessions, devices, enrollments, courses, users RESTART IDENTITY CASCADE")
+            text(
+                "TRUNCATE audit_logs, consents, used_refresh_tokens, sessions, devices, enrollments, courses, "
+                "users RESTART IDENTITY CASCADE"
+            )
         )
     yield async_sessionmaker(engine, expire_on_commit=False)
     await engine.dispose()
