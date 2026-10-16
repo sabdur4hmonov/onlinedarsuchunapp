@@ -201,7 +201,56 @@ orqali yozilgan (`app/services/video/`), boshqa servisga o'tish uchun bitta yang
    yarim shaffof holda har 5 soniyada joyini o'zgartirib turadi — dars tarqalsa, kim tarqatgani ko'rinadi.
 4. Har bir playback so'rovi (ruxsat berilgan ham, rad etilgan ham) `audit_logs` ga yoziladi.
 
-## 5. Muammolar va yechimlar
+## 5. Jonli darslar (LiveKit) va avtomatik yozib olish
+
+Kod `LiveProvider` interfeysi orqali yozilgan (`app/services/live/`). Yozuvlar uchun vaqtinchalik
+saqlash — `app/services/storage.py` (S3/MinIO).
+
+### 5.1. Mock rejim
+`.env` da `LIVEKIT_API_KEY`/`LIVEKIT_API_SECRET` bo'sh bo'lsa — `MockLiveProvider`,
+`RECORDINGS_S3_ACCESS_KEY`/`SECRET_KEY` bo'sh bo'lsa — xotiradagi mock storage ishlaydi.
+`GET /health` qaysi biri ishlayotganini ko'rsatadi. Testlar har doim mock bilan ishlaydi.
+`ENVIRONMENT=production` da mock'lar bilan server ishga tushmaydi.
+
+### 5.2. Lokal LiveKit (Docker)
+1. `.env` da `LIVEKIT_API_KEY`, `LIVEKIT_API_SECRET` (kamida 32 belgi), `MINIO_ROOT_USER`,
+   `MINIO_ROOT_PASSWORD` ni to'ldiring; `RECORDINGS_S3_ACCESS_KEY/SECRET_KEY` = MinIO login/parol.
+2. `docker compose --profile live up -d` — PostgreSQL + LiveKit + Redis + Egress + MinIO.
+3. `python -m app.cli init-recordings-bucket` — YOPIQ bucket + 7 kunlik avto-o'chirish qoidasi.
+4. Backend'ni 8000-portda ishga tushiring (LiveKit webhook'lari `host.docker.internal:8000` ga keladi).
+5. MinIO konsoli: http://127.0.0.1:9001. Rasmiy `minio/minio` image'lari endi tarqatilmaydi,
+   shuning uchun `pgsty/minio` (MinIO'ning hamjamiyat build'i) ishlatilgan — faqat dev uchun.
+6. Telefondan sinash: `LIVEKIT_NODE_IP` = kompyuteringizning Wi-Fi IP manzili, `LIVEKIT_BIND_IP=0.0.0.0`.
+
+### 5.3. Oqim
+- O'qituvchi: `POST /teacher/courses/{id}/live-sessions` (rejalashtirish), `PATCH`, `/cancel`,
+  `/start` (room + publish token + yozuv AVTOMATIK boshlanadi), `/end`, `/recording/retry`.
+- Student: `POST /live-sessions/{id}/join` → faqat subscribe huquqli token (10 daqiqa, identity = user ID),
+  `watermark` (ID + telefon) — app uni video ustiga o'zi chizadi. `client_options` ni SDK'ga bering
+  (adaptive stream, dynacast, simulcast — bular klient sozlamalari).
+- Webhook: `POST /webhooks/livekit` — imzo rasmiy `WebhookReceiver` bilan tekshiriladi.
+- Yozuv: `egress_ended` → yangi dars → VdoCipher URL orqali import (qisqa muddatli presigned URL) →
+  video tayyor bo'lgach mp4 vaqtinchalik saqlashdan O'CHIRILADI. Xato → `recording_status=failed`,
+  sababi `recording_error` va audit'da, `/recording/retry` xato bo'lgan qadamdan davom ettiradi.
+- Room `empty_timeout`/`departure_timeout` = 10 daqiqa: o'qituvchi uzilsa, dars va yozuv davom etadi.
+
+### 5.4. TURN (ishlab chiqarishda MAJBURIY)
+Ba'zi mobil operatorlar va korporativ tarmoqlar UDP'ni bloklaydi. Shunda WebRTC faqat
+**TURN over TLS, 443-port** orqali ishlaydi. LiveKit Cloud'da bu tayyor. O'z serveringizda:
+`turn.enabled: true`, `turn.domain`, `turn.tls_port: 443` va shu domen uchun TLS sertifikat.
+
+### 5.5. Mobil app: qayta ulanish bo'yicha tavsiyalar
+- LiveKit SDK o'zi qayta ulanadi: `RoomEvent.reconnecting` / `reconnected` da "Ulanish tiklanmoqda..." ko'rsating.
+- `disconnected` bo'lsa — `/join` (o'qituvchi uchun `/start`) ni qayta chaqirib, YANGI token bilan ulaning.
+- `DUPLICATE_IDENTITY` sababi bilan chiqarilsa — "Akkauntingizga boshqa joydan kirildi" deb ko'rsating, qayta ulanmang.
+- Wi-Fi ↔ mobil internet almashganda SDK'ga xalaqit bermang; ilovani fon rejimidan qaytganda holatni tekshiring.
+
+### 5.6. Ishlab chiqarish uchun kerak
+LiveKit Cloud yoki o'z LiveKit serveri (TLS `wss://`, TURN/TLS 443), egress (Cloud'da tayyor),
+yopiq S3-mos bucket (AWS S3 / Cloudflare R2), VdoCipher kaliti. Presigned URL VdoCipher'ga
+internetdan ochiq bo'lishi kerak — lokal MinIO'ga VdoCipher ulana olmaydi.
+
+## 6. Muammolar va yechimlar
 
 | Muammo | Yechim |
 |---|---|
@@ -216,7 +265,7 @@ orqali yozilgan (`app/services/video/`), boshqa servisga o'tish uchun bitta yang
 
 ---
 
-## 6. Papka tuzilmasi
+## 7. Papka tuzilmasi
 
 ```
 backend/
