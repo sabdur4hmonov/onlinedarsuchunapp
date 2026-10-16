@@ -9,6 +9,8 @@ import { COOKIE } from "@/lib/server/cookie-names";
  */
 
 const isDev = process.env.NODE_ENV === "development";
+// Only a panel served over https may force https for every sub-request
+const isHttps = (process.env.PANEL_ORIGIN ?? "").startsWith("https://");
 // Extra places the browser may connect to, space-separated: the LiveKit server (ws/wss)
 // and the video upload host (VdoCipher's storage, or the backend's mock upload in dev).
 const extraConnectSrc = (process.env.CSP_CONNECT_SRC ?? "").trim();
@@ -28,7 +30,7 @@ function contentSecurityPolicy(nonce: string): string {
     "base-uri 'self'",
     "form-action 'self'",
     "frame-ancestors 'none'",
-    ...(isDev ? [] : ["upgrade-insecure-requests"]),
+    ...(isHttps ? ["upgrade-insecure-requests"] : []),
   ].join("; ");
 }
 

@@ -64,7 +64,7 @@ export function LoginForm({ next }: { next: string }) {
             <Input id="password" name="password" type="password" autoComplete="current-password" required />
           </div>
           {error && (
-            <p role="alert" className="rounded-md bg-destructive/10 px-3 py-2 text-sm text-destructive">
+            <p role="alert" data-testid="login-error" className="rounded-md bg-destructive/10 px-3 py-2 text-sm text-destructive">
               {error}
             </p>
           )}
