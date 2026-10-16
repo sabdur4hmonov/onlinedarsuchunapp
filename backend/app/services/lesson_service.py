@@ -41,15 +41,22 @@ async def list_lessons(db: AsyncSession, course_id: uuid.UUID, *, only_ready: bo
     return list(await db.scalars(stmt.order_by(Lesson.position, Lesson.created_at)))
 
 
+async def append_lesson(db: AsyncSession, *, course_id: uuid.UUID, title: str, description: str | None) -> Lesson:
+    """Adds a lesson at the end of the course (no permission check, no commit)."""
+    # Lock the course so two parallel creates do not get the same position
+    await db.execute(select(Course.id).where(Course.id == course_id).with_for_update())
+    last = await db.scalar(select(func.max(Lesson.position)).where(Lesson.course_id == course_id))
+    lesson = Lesson(course_id=course_id, title=title, description=description, position=(last or 0) + 1)
+    db.add(lesson)
+    await db.flush()
+    return lesson
+
+
 async def create_lesson(
     db: AsyncSession, *, teacher: User, course_id: uuid.UUID, title: str, description: str | None, ip: str | None
 ) -> Lesson:
-    # Lock the course so two parallel creates do not get the same position
-    course = await get_own_course(db, teacher=teacher, course_id=course_id, lock=True)
-    last = await db.scalar(select(func.max(Lesson.position)).where(Lesson.course_id == course.id))
-    lesson = Lesson(course_id=course.id, title=title, description=description, position=(last or 0) + 1)
-    db.add(lesson)
-    await db.flush()
+    course = await get_own_course(db, teacher=teacher, course_id=course_id)
+    lesson = await append_lesson(db, course_id=course.id, title=title, description=description)
     log_event(db, AuditEvent.LESSON_CREATED, user_id=teacher.id, ip=ip, course_id=course.id, lesson_id=lesson.id)
     await db.commit()
     return lesson

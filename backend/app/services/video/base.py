@@ -59,6 +59,10 @@ class VideoProvider(ABC):
     async def create_upload(self, *, title: str) -> UploadCredentials: ...
 
     @abstractmethod
+    async def import_from_url(self, *, url: str, title: str) -> str:
+        """Provider downloads the file itself from `url` (e.g. a presigned S3 link). Returns the video ID."""
+
+    @abstractmethod
     async def get_video_info(self, video_id: str) -> VideoInfo | None:
         """Current status straight from the provider. None if the video does not exist."""
 

@@ -42,6 +42,40 @@ class Settings(BaseSettings):
     playback_rate_limit_attempts: int = 10
     playback_rate_limit_window_seconds: int = 60
 
+    # --- Live lessons: LiveKit. Any of the three empty -> MockLiveProvider (dev and tests) ---
+    # URL the mobile app / browser connects to (ws:// locally, wss:// in production)
+    livekit_url: str = ""
+    # URL the backend uses for server API calls; defaults to livekit_url with http(s)://
+    livekit_api_url: str = ""
+    livekit_api_key: str = ""
+    livekit_api_secret: str = ""
+    live_student_token_ttl_minutes: int = Field(default=10, ge=1, le=30)
+    live_teacher_token_ttl_minutes: int = Field(default=60, ge=1, le=240)
+    # How long LiveKit keeps an empty room (e.g. teacher's internet dropped) before closing it
+    live_room_empty_timeout_seconds: int = Field(default=600, ge=60)
+    live_join_rate_limit_attempts: int = 10
+    live_join_rate_limit_window_seconds: int = 60
+
+    # --- Temporary storage for raw recordings (S3 / MinIO). Empty -> in-memory mock storage ---
+    # Endpoint the BACKEND uses (presigned URLs, deleting files). Empty = real AWS S3.
+    recordings_s3_endpoint_url: str = ""
+    # Endpoint the EGRESS container uses to upload; locally "http://minio:9000"
+    recordings_s3_egress_endpoint_url: str = ""
+    recordings_s3_bucket: str = ""
+    recordings_s3_region: str = "us-east-1"
+    recordings_s3_access_key: str = ""
+    recordings_s3_secret_key: str = ""
+    # VdoCipher downloads the mp4 through this link; keep it short
+    recordings_presigned_url_ttl_seconds: int = Field(default=1800, ge=60, le=6 * 3600)
+
+    @property
+    def livekit_configured(self) -> bool:
+        return bool(self.livekit_url and self.livekit_api_key and self.livekit_api_secret)
+
+    @property
+    def recordings_storage_configured(self) -> bool:
+        return bool(self.recordings_s3_bucket and self.recordings_s3_access_key and self.recordings_s3_secret_key)
+
 
 @lru_cache
 def get_settings() -> Settings:

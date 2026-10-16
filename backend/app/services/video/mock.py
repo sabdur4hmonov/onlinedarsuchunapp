@@ -31,6 +31,8 @@ class MockVideoProvider(VideoProvider):
         self.videos: dict[str, VideoInfo] = {}
         self.otp_requests: list[dict] = []
         self.deleted: list[str] = []
+        self.imports: list[dict] = []
+        self.fail_import = False  # test switch: simulate a provider error on import
 
     def set_status(self, video_id: str, status: LessonStatus, duration_seconds: int | None = None) -> None:
         """Test helper: pretend the provider finished (or failed) processing."""
@@ -44,6 +46,14 @@ class MockVideoProvider(VideoProvider):
             upload_url=f"https://mock-video.invalid/upload/{video_id}",
             fields={"key": video_id, "policy": "mock-policy"},
         )
+
+    async def import_from_url(self, *, url: str, title: str) -> str:
+        if self.fail_import:
+            raise VideoProviderError("Mock: import failed")
+        video_id = f"mock-{uuid.uuid4().hex}"
+        self.imports.append({"video_id": video_id, "url": url, "title": title})
+        self.videos[video_id] = VideoInfo(status=LessonStatus.PROCESSING)
+        return video_id
 
     async def get_video_info(self, video_id: str) -> VideoInfo | None:
         info = self.videos.get(video_id)

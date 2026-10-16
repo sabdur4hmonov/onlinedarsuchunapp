@@ -100,6 +100,14 @@ class VdoCipherProvider(VideoProvider):
         fields = {**payload, "success_action_status": "201", "success_action_redirect": ""}
         return UploadCredentials(video_id=video_id, upload_url=upload_url, fields=fields)
 
+    async def import_from_url(self, *, url: str, title: str) -> str:
+        # https://www.vdocipher.com/docs/server/upload/import-url/
+        data = self._ensure_ok(await self._request("PUT", "/videos/importUrl", json={"url": url, "title": title}))
+        video_id = data.get("id") or data.get("videoId")
+        if not isinstance(video_id, str) or not video_id:
+            raise VideoProviderError("Unexpected VdoCipher import response")
+        return video_id
+
     async def get_video_info(self, video_id: str) -> VideoInfo | None:
         response = await self._request("GET", f"/videos/{video_id}")
         if response.status_code == 404:

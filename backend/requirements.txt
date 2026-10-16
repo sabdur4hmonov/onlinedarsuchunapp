@@ -6,4 +6,6 @@ alembic==1.20.0
 pydantic-settings==2.16.0
 argon2-cffi==25.1.0
 pyjwt==2.15.1
+livekit-api==1.2.2
+boto3==1.43.114
 httpx==0.28.1
