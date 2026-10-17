@@ -12,14 +12,14 @@ Oxirgi yangilanish: 2026-10-17
 |---|---|---|
 | 1 | Backend asosi: auth, qurilma qoidalari, sessiyalar, rozilik, audit | ✅ Tayyor |
 | 2A | Xavfsizlik tuzatishlari (1 qurilma = 1 akkaunt, refresh reuse) + video darslar, VdoCipher (`VideoProvider`) | ✅ Tayyor |
-| 2B | O'qituvchi web paneli (`teacher-panel/`, Next.js) | 🟡 Jarayonda |
+| 2B | O'qituvchi web paneli (`teacher-panel/`, Next.js) | ✅ Tayyor |
 | 2C | Jonli darslar (LiveKit) + avtomatik yozib olish → video dars | ✅ Tayyor |
 | 3 | Flutter student ilovasi (`mobile/`) | ⬜ Boshlanmagan |
 | 4 | Imtihonlar | ⬜ Boshlanmagan |
 | 5 | ML kamera nazorati | ⬜ Boshlanmagan |
 | 6 | To'lov | ⬜ Boshlanmagan |
 
-## Hozir nima qilinyapti (2B)
+## Oxirgi tugallangan bosqich: 2B (o'qituvchi paneli)
 
 Tayyor va push qilingan:
 - Backend: CORS (`CORS_ALLOWED_ORIGINS`), ishonchli proxy IP (`TRUSTED_PROXY_IPS`), kursni olish/tahrirlash,
@@ -41,18 +41,20 @@ Tayyor va push qilingan:
   (`127.0.0.1` bilan egress `page load error: websocket url timeout`). Lokal `backend/.env` xavfsiz
   holatga (`127.0.0.1`) qaytarilgan.
 
-Qayerda turibman: haqiqiy yozuv tasdiqlandi, endi hujjatlar (panel README, root README).
+Qayerda turibman: 2B tugadi (kod, testlar, hujjatlar push qilingan). Keyingi bosqich — 3.
 
-## Keyingi aniq qadam
+## Keyingi aniq qadam: 3-bosqich — Flutter o'quvchi ilovasi (`mobile/`)
 
-1. `teacher-panel/README.md` — Windows'da ishga tushirish (oddiy tilda): Node.js o'rnatish,
-   `copy .env.example .env.local`, `npm install`, backend ishlab turishi, `npm run dev`,
-   http://localhost:3000, demo akkauntlar (`backend/scripts/seed_demo.py`), `npm run test:e2e`,
-   haqiqiy yozuv sinovi, ishlab chiqarish talablari (HTTPS, reverse proxy `X-Forwarded-For` ni ustidan
-   yozadi, `PANEL_ORIGIN`, `CSP_CONNECT_SRC`, bitta instance yoki Redis).
-2. Root `README.md`: `teacher-panel/` holatini yangilash, panel README'siga havola.
-3. PROGRESS.md: 2B ni tayyor qilish, keyingi bosqich — 3 (Flutter student ilovasi).
-4. Commit + push, foydalanuvchiga xulosa.
+Foydalanuvchidan 3-bosqich uchun batafsil topshiriq kutiladi. Boshlashdan oldin hisobga olinadigan narsalar:
+1. Backend API: `backend/app/api/routes/` (auth, consents, courses, lessons, live). Student oqimi:
+   `POST /auth/login` -> `device_binding_required` -> `POST /auth/devices/bind` -> tokenlar;
+   har so'rovda `Authorization` + `X-Device-ID`.
+2. `X-Device-ID` ilova qayta o'rnatilganda ham o'zgarmasligi kerak (Android Keystore / iOS Keychain).
+3. Refresh so'rovi bir vaqtda faqat bitta (aks holda reuse detection barcha sessiyalarni yopadi).
+4. Video: VdoCipher Flutter SDK, `POST /lessons/{id}/playback` -> `otp` + `playback_info`.
+5. Jonli dars: LiveKit Flutter SDK, `POST /live-sessions/{id}/join` -> token (faqat subscribe),
+   `client_options` (adaptive stream, dynacast) va `watermark` (ilova o'zi video ustiga chizadi).
+6. Rozilik: `POST /consents` (`camera`, `data_processing`), aks holda kontent 403 `consent_required`.
 
 ## Lokal ishga tushirish (qisqa)
 
