@@ -85,6 +85,11 @@ services:
         redis:
           address: redis:6379
         log_level: info
+        # Locally LiveKit announces 127.0.0.1 for media; Chrome ignores loopback ICE
+        # candidates unless this flag is set (otherwise: "Start signal not received")
+        chrome_flags:
+          allow-loopback-in-peer-connection: true
+          disable-features: WebRtcHideLocalIpsWithMdns
 
   # S3-compatible temporary storage for raw recordings.
   # The official minio/minio images are no longer published; pgsty/minio is a

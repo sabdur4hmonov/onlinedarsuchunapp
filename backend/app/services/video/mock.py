@@ -7,6 +7,7 @@ and remembers it in `otp_requests`, so tests can check what would be sent.
 import base64
 import json
 import secrets
+import time
 import uuid
 
 from app.models import LessonStatus
@@ -24,7 +25,9 @@ from app.services.video.vdocipher import build_otp_body, parse_vdocipher_webhook
 class MockVideoProvider(VideoProvider):
     name = "mock"
 
-    def __init__(self, *, auto_ready: bool = False, upload_base_url: str | None = None) -> None:
+    def __init__(
+        self, *, auto_ready: bool = False, upload_base_url: str | None = None, processing_seconds: float = 0
+    ) -> None:
         # auto_ready=True (dev server): a video that finished "uploading" reports "ready" when asked.
         # Without upload_base_url nothing can be uploaded, so then even "uploading" videos turn ready,
         # and the whole flow can still be clicked through in /docs.
@@ -33,6 +36,9 @@ class MockVideoProvider(VideoProvider):
         # so the teacher panel's upload + progress bar work without VdoCipher.
         self.upload_base_url = upload_base_url.rstrip("/") if upload_base_url else None
         self.upload_tokens: dict[str, str] = {}
+        # Simulated encoding time: an auto_ready video stays "processing" this long (dev/manual tests)
+        self.processing_seconds = processing_seconds
+        self.ready_at: dict[str, float] = {}
         self.videos: dict[str, VideoInfo] = {}
         self.otp_requests: list[dict] = []
         self.deleted: list[str] = []
@@ -67,6 +73,7 @@ class MockVideoProvider(VideoProvider):
             return False
         del self.upload_tokens[video_id]
         self.videos[video_id] = VideoInfo(status=LessonStatus.PROCESSING)
+        self.ready_at[video_id] = time.monotonic() + self.processing_seconds
         return True
 
     async def import_from_url(self, *, url: str, title: str) -> str:
@@ -75,12 +82,14 @@ class MockVideoProvider(VideoProvider):
         video_id = f"mock-{uuid.uuid4().hex}"
         self.imports.append({"video_id": video_id, "url": url, "title": title})
         self.videos[video_id] = VideoInfo(status=LessonStatus.PROCESSING)
+        self.ready_at[video_id] = time.monotonic() + self.processing_seconds
         return video_id
 
     async def get_video_info(self, video_id: str) -> VideoInfo | None:
         info = self.videos.get(video_id)
         promotable = {LessonStatus.PROCESSING} if self.upload_base_url else {LessonStatus.UPLOADING, LessonStatus.PROCESSING}
-        if info is not None and self.auto_ready and info.status in promotable:
+        still_encoding = time.monotonic() < self.ready_at.get(video_id, 0)
+        if info is not None and self.auto_ready and info.status in promotable and not still_encoding:
             info = VideoInfo(status=LessonStatus.READY, duration_seconds=600)
             self.videos[video_id] = info
         return info

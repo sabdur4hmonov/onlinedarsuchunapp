@@ -51,6 +51,8 @@ class Settings(BaseSettings):
     # Mock mode only: where browsers upload files (e.g. http://localhost:8000/dev/mock-video-upload).
     # Empty = uploads are impossible and "sync-status" marks videos ready right away.
     mock_video_upload_url: str = ""
+    # Mock mode only: how long a video "encodes" before it turns ready (0 = immediately)
+    mock_video_processing_seconds: float = 0
 
     # --- Live lessons: LiveKit. Any of the three empty -> MockLiveProvider (dev and tests) ---
     # URL the mobile app / browser connects to (ws:// locally, wss:// in production)

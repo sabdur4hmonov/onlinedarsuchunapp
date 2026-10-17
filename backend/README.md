@@ -221,6 +221,17 @@ saqlash — `app/services/storage.py` (S3/MinIO).
 5. MinIO konsoli: http://127.0.0.1:9001. Rasmiy `minio/minio` image'lari endi tarqatilmaydi,
    shuning uchun `pgsty/minio` (MinIO'ning hamjamiyat build'i) ishlatilgan — faqat dev uchun.
 6. Telefondan sinash: `LIVEKIT_NODE_IP` = kompyuteringizning Wi-Fi IP manzili, `LIVEKIT_BIND_IP=0.0.0.0`.
+7. **Lokal yozib olish (egress) ishlashi uchun ham** 6-banddagi sozlama kerak (`LIVEKIT_NODE_IP` = Wi-Fi IP,
+   `LIVEKIT_BIND_IP=0.0.0.0`), so'ng `docker compose --profile live up -d livekit egress`.
+   `127.0.0.1` bilan efir ishlaydi, lekin yozuv `EGRESS_FAILED` bo'ladi. Wi-Fi IP'ni bilish (PowerShell):
+   `Get-NetIPAddress -AddressFamily IPv4`. Eslatma: `0.0.0.0` portlarni Wi-Fi tarmog'ingizga ochadi —
+   sinovdan keyin `127.0.0.1` ga qaytaring.
+8. Egress konteyneri qayta ishga tushgandan keyingi **birinchi** yozuv ba'zan
+   `page load error: websocket url timeout` bilan yiqiladi (Chrome sovuq start). Panelda
+   "Yozuvni qayta urinish" tugmasi yoki keyingi efir muammosiz ishlaydi.
+
+Haqiqiy yozuvni avtomatik sinash (panel orqali, soxta kamera bilan):
+`teacher-panel` papkasida `npx playwright test -c playwright.real.config.ts` (talablar fayl boshida yozilgan).
 
 ### 5.3. Oqim
 - O'qituvchi: `POST /teacher/courses/{id}/live-sessions` (rejalashtirish), `PATCH`, `/cancel`,

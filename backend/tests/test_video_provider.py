@@ -1,6 +1,7 @@
 """Checks the REAL VdoCipher provider code against a fake HTTP server (httpx.MockTransport):
 right URLs, auth header, OTP body with watermark. No network, no API key needed."""
 
+import asyncio
 import json
 
 import httpx
@@ -73,3 +74,13 @@ async def test_vdocipher_status_mapping_and_errors():
 def test_otp_ttl_cannot_exceed_five_minutes():
     with pytest.raises(ValidationError):
         Settings(_env_file=None, database_url="x", jwt_secret="x" * 32, playback_otp_ttl_seconds=301)
+
+
+async def test_mock_processing_delay():
+    from app.services.video import MockVideoProvider
+
+    mock = MockVideoProvider(auto_ready=True, processing_seconds=0.2)
+    video_id = await mock.import_from_url(url="https://x.invalid/a.mp4", title="t")
+    assert (await mock.get_video_info(video_id)).status == LessonStatus.PROCESSING
+    await asyncio.sleep(0.25)
+    assert (await mock.get_video_info(video_id)).status == LessonStatus.READY

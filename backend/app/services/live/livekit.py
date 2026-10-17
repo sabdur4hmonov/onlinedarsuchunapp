@@ -47,6 +47,8 @@ class LiveKitProvider(LiveProvider):
         output = lk.EncodedFileOutput(
             file_type=lk.EncodedFileType.MP4,
             filepath=object_key,
+            # No "<egress_id>.json" next to the mp4: only one file to delete when the video is ready
+            disable_manifest=True,
             s3=lk.S3Upload(
                 access_key=target.access_key,
                 secret=target.secret_key,

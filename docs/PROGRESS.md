@@ -24,33 +24,35 @@ Oxirgi yangilanish: 2026-10-17
 Tayyor va push qilingan:
 - Backend: CORS (`CORS_ALLOWED_ORIGINS`), ishonchli proxy IP (`TRUSTED_PROXY_IPS`), kursni olish/tahrirlash,
   kurs o'quvchilari ro'yxati va chiqarish, kurs hodisalari jurnali, mock rejimda brauzerdan yuklash
-  (`MOCK_VIDEO_UPLOAD_URL`, `/dev/mock-video-upload`). Backend testlari: 82 ta, hammasi o'tadi.
+  (`MOCK_VIDEO_UPLOAD_URL`, `/dev/mock-video-upload`), mock "kodlash" kechikishi
+  (`MOCK_VIDEO_PROCESSING_SECONDS`). Backend testlari: 83 ta, hammasi o'tadi.
 - Panel skeleti: BFF (`src/app/api/bff/[...path]`, `src/app/api/auth/*`), tokenlar faqat httpOnly
   `__Host-` cookie'larda, single-flight refresh (`src/lib/server/session.ts`), nonce CSP (`src/proxy.ts`),
   xavfsizlik headerlari (`next.config.ts`), barcha matnlar `src/lib/i18n/uz.ts`.
 - Sahifalar: login, kurslar, kurs ichida tablar (o'quvchilar, video darslar, jonli darslar, hodisalar jurnali).
 - Efir sahifasi: `src/components/studio/studio.tsx` (livekit-client).
-- Playwright E2E (mock rejim): `teacher-panel/e2e/panel.spec.ts` — 11 ta test, hammasi o'tadi
-  (`npm run test:e2e`; o'zi 8100-portda backend va 3100-portda panel ishga tushiradi,
-  `course_platform_e2e` bazasini har safar tozalaydi).
+- Playwright E2E (mock): `teacher-panel/e2e/panel.spec.ts` — 11 ta test, hammasi o'tadi (`npm run test:e2e`).
+- **Haqiqiy yozuv sinovi O'TDI** (`e2e/real-recording.spec.ts`, `playwright.real.config.ts`):
+  panel -> soxta kamera bilan efir -> LiveKit egress -> MinIO'da haqiqiy mp4 (10,7 MB, 75 s; ikkinchi
+  marta 30 s) -> yangi dars -> `processing` -> `ready` -> mp4 MinIO'dan o'chirildi.
+  Topilgan va tuzatilgan narsalar: egress Chrome'iga `disable-features: WebRtcHideLocalIpsWithMdns`
+  (`backend/docker-compose.yml`), egress manifest JSON o'chirildi (`disable_manifest=True`).
+  Shart: lokal yozuv faqat `LIVEKIT_NODE_IP` = Wi-Fi IP va `LIVEKIT_BIND_IP=0.0.0.0` bilan ishladi
+  (`127.0.0.1` bilan egress `page load error: websocket url timeout`). Lokal `backend/.env` xavfsiz
+  holatga (`127.0.0.1`) qaytarilgan.
 
-Qayerda turibman: E2E testlar tayyor, endi **haqiqiy yozuv sinovi**.
+Qayerda turibman: haqiqiy yozuv tasdiqlandi, endi hujjatlar (panel README, root README).
 
 ## Keyingi aniq qadam
 
-1. **Haqiqiy yozuv sinovi** — `teacher-panel/e2e/real-recording.spec.ts` yozish (oddiy `npm run test:e2e`
-   dan chiqarilgan: `playwright.config.ts` da `testIgnore: /real-recording/`). Alohida config
-   (`playwright.real.config.ts`) bilan ishga tushadi:
-   - Oldindan: `cd backend && docker compose --profile live up -d`; backend 8000-portda haqiqiy
-     `backend/.env` bilan (LiveKit + MinIO sozlangan, video provider mock); panel 3000-portda (`npm run dev`).
-   - Chromium flaglari: `--use-fake-device-for-media-stream`, `--use-fake-ui-for-media-stream`.
-   - Qadamlar: demo o'qituvchi bilan login → kurs → jonli dars rejalashtirish → efir sahifasi →
-     "Darsni boshlash" → 70-90 soniya kutish → "Darsni tugatish" → `recording_status` ni kuzatish.
-   - Tekshirish: MinIO'da `recordings/<live_session_id>/...mp4` paydo bo'lishi (boto3 yoki
-     `docker compose exec minio ...`) va `recording_status` `processing`/`ready` ga o'tishi.
-   - Ishlamasa: sababini qisqa yozib qo'yish (ko'p vaqt sarflamaslik), keyingi qadamga o'tish.
-2. `teacher-panel/README.md` — Windows'da ishga tushirish (oddiy tilda), root `README.md` ni yangilash.
-3. PROGRESS.md'ni yangilash, commit + push, foydalanuvchiga xulosa.
+1. `teacher-panel/README.md` — Windows'da ishga tushirish (oddiy tilda): Node.js o'rnatish,
+   `copy .env.example .env.local`, `npm install`, backend ishlab turishi, `npm run dev`,
+   http://localhost:3000, demo akkauntlar (`backend/scripts/seed_demo.py`), `npm run test:e2e`,
+   haqiqiy yozuv sinovi, ishlab chiqarish talablari (HTTPS, reverse proxy `X-Forwarded-For` ni ustidan
+   yozadi, `PANEL_ORIGIN`, `CSP_CONNECT_SRC`, bitta instance yoki Redis).
+2. Root `README.md`: `teacher-panel/` holatini yangilash, panel README'siga havola.
+3. PROGRESS.md: 2B ni tayyor qilish, keyingi bosqich — 3 (Flutter student ilovasi).
+4. Commit + push, foydalanuvchiga xulosa.
 
 ## Lokal ishga tushirish (qisqa)
 
@@ -64,8 +66,6 @@ Qayerda turibman: E2E testlar tayyor, endi **haqiqiy yozuv sinovi**.
   (`VDOCIPHER_API_SECRET` hali yo'q). Kod `app/services/video/vdocipher.py` da, bilimga tayanib yozilgan.
 - **Yozuvni VdoCipher'ga import qilish**: presigned URL internetdan ochiq bo'lishi kerak, lokal MinIO'ga
   VdoCipher ulana olmaydi.
-- **Haqiqiy mp4 yozuv** hali olinmagan (oldingi urinish: xonada video yuboruvchi yo'q edi →
-  egress "Start signal not received"; Python test-publisher LiveKit'ga ulana olmadi — sababi aniqlanmagan).
 - Panelda brauzerdan VdoCipher S3'ga to'g'ridan-to'g'ri yuklash (mock endpoint orqali sinalgan).
 
 ## Ma'lum muammolar / e'tibor berish kerak
@@ -78,6 +78,9 @@ Qayerda turibman: E2E testlar tayyor, endi **haqiqiy yozuv sinovi**.
 - Hodisalar jurnali JSONB bo'yicha qidiradi, indeks yo'q — ma'lumot ko'payganda indeks kerak.
 - Rasmiy `minio/minio` Docker image'lari endi tarqatilmaydi; lokal dev uchun `pgsty/minio` ishlatilgan.
 - Egress uchun `shm_size: 1gb` shart (aks holda Chrome ishga tushmaydi).
+- Egress konteyneri qayta ishga tushgandan keyingi birinchi yozuv ko'pincha yiqiladi (Chrome sovuq start,
+  `page load error: websocket url timeout`); qayta urinish ishlaydi. LiveKit Cloud'da alohida tekshirish kerak.
+- Lokal yozuv `127.0.0.1` media IP bilan ishlamaydi — sababi to'liq aniqlanmagan, Wi-Fi (LAN) IP kerak.
 - Mobil ilova refresh so'rovini bir vaqtda faqat bitta yuborishi kerak (reuse detection).
 - Lokal `backend/.env` da haqiqiy lokal LiveKit/MinIO kalitlari bor → live stack o'chiq bo'lsa,
   dars boshlash 502 beradi. Mock'ga qaytish: `LIVEKIT_API_KEY` va `LIVEKIT_API_SECRET` ni bo'shatish.
